@@ -8,6 +8,7 @@ Achtergrondtool voor Windows 11 die het **Apple Wireless Keyboard (A1314)** brui
 |---|---|
 | **Fn** | werkt als linker **Ctrl** |
 | **Ctrl+Backspace** (dus ook Fn+Backspace) | **Delete** |
+| **= + Backspace** ("=" vasthouden naast Backspace) | **Delete** — "=" werkt als vasthoudtoets: een losse tik typt gewoon "=" (pas bij loslaten); auto-repeat van "=" vervalt |
 | **Fn+F1 / F2** | helderheid − / + (intern scherm, via WMI) |
 | **Fn+F3** | taakweergave (Win+Tab) |
 | **Fn+F4** | widgets (Win+W) |

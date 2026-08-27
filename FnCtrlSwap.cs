@@ -21,6 +21,9 @@ namespace FnCtrlSwap
         static Hid.LowLevelKeyboardProc _hookProc;
         static IntPtr _hookHandle;
         static readonly bool[] _swallowUp = new bool[256];
+        static bool _eqDown;       // fysieke "="-toets is ingedrukt
+        static bool _eqPending;    // ingeslikte "=" die bij loslaten alsnog getypt wordt
+        static bool _eqAsModifier; // "=" is als Delete-modifier gebruikt: up inslikken
 
         public static bool CtrlInjected { get { return _ctrlInjected; } }
 
@@ -89,6 +92,43 @@ namespace FnCtrlSwap
                     if (up && _swallowUp[vk])
                     {
                         _swallowUp[vk] = false;
+                        return (IntPtr)1;
+                    }
+                    // "=" (naast Backspace) is een vasthoudtoets: samen met Backspace -> Delete.
+                    // Een losse tik "=" wordt pas bij het loslaten getypt; auto-repeat van "=" vervalt.
+                    if (vk == 0xBB && Active)
+                    {
+                        if (down)
+                        {
+                            if (!_eqDown)
+                            {
+                                _eqDown = true;
+                                if ((Hid.GetAsyncKeyState(0x08) & 0x8000) != 0)
+                                {
+                                    _eqAsModifier = true;
+                                    QueueAction(delegate { Hid.TapKey(0x2E, 0x53, true); }); // Delete
+                                }
+                                else _eqPending = true;
+                            }
+                            return (IntPtr)1; // ook auto-repeat inslikken
+                        }
+                        if (up && _eqDown)
+                        {
+                            _eqDown = false;
+                            bool wasMod = _eqAsModifier, wasPending = _eqPending;
+                            _eqAsModifier = false;
+                            _eqPending = false;
+                            if (wasPending)
+                                QueueAction(delegate { Hid.TapKey(0xBB, 0x0D, false); }); // alsnog "="
+                            if (wasMod || wasPending) return (IntPtr)1;
+                        }
+                    }
+                    if (down && Active && vk == 0x08 && _eqDown)
+                    {
+                        _eqPending = false;
+                        _eqAsModifier = true;
+                        _swallowUp[vk] = true;
+                        QueueAction(delegate { Hid.TapKey(0x2E, 0x53, true); }); // Delete (herhaalt met Backspace-repeat)
                         return (IntPtr)1;
                     }
                     if (down && Active)
@@ -562,6 +602,13 @@ namespace FnCtrlSwap
             if (extended) flags |= 1u;   // KEYEVENTF_EXTENDEDKEY
             input[0].U.ki.dwFlags = flags;
             SendInput(1, input, Marshal.SizeOf(typeof(INPUT)));
+        }
+
+        // Simpele toetsaanslag (down+up), met de modifiers die op dat moment ingedrukt zijn
+        public static void TapKey(ushort vk, ushort scan, bool extended)
+        {
+            SendKeyExt(vk, scan, extended, true);
+            SendKeyExt(vk, scan, extended, false);
         }
 
         // Toets aanslaan met tijdelijk losgelaten Ctrl, zodat de app een "kale" toets ziet
